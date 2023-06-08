@@ -1,18 +1,13 @@
-import numpy as np
-import torch
-import torch.nn as nn
 import math
-import torch.nn.functional as F
+
+import  torch
+from torch import nn
+import numpy as np
 from torch.autograd import Variable
+import torch.nn.functional as F
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# 1. Embeddings_extractor
-
-# 2. DistanceNetwork
-
-# 3. AttentionalClassify
-
-# 4. BidirectionalLSTM
 def convLayer(in_channels, out_channels, dropout_prob=0.0):
     """
     :param dataset_name: The name of dataset(one of "train","val","test")
@@ -53,7 +48,7 @@ class Embeddings_extractor(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = x.view(x.size()[0], -1)
+        x = x.contiguous().view(x.size()[0], -1)
         return x
 class AttentionalClassify(nn.Module):
     def __init__(self):
@@ -111,9 +106,10 @@ class BidirectionalLSTM(nn.Module):
         self.num_layer = len(layer_size)
         self.lstm = nn.LSTM(input_size=self.vector_dim, num_layers=self.num_layer, hidden_size=self.hidden_size,
                             bidirectional=True)
+        # 虽然定义了模型model.to（device），但是隐藏层是在运行中生成的，要对其放入GPU，不然就是一个cpu下的张量
         self.hidden = (
-        Variable(torch.zeros(self.lstm.num_layers * 2, self.batch_size, self.lstm.hidden_size), requires_grad=False),
-        Variable(torch.zeros(self.lstm.num_layers * 2, self.batch_size, self.lstm.hidden_size), requires_grad=False))
+        Variable(torch.zeros(self.lstm.num_layers * 2, self.batch_size, self.lstm.hidden_size), requires_grad=False).to(device),
+        Variable(torch.zeros(self.lstm.num_layers * 2, self.batch_size, self.lstm.hidden_size), requires_grad=False).to(device))
 
     def repackage_hidden(self, h):
         """Wraps hidden states in new Variables,
@@ -127,9 +123,9 @@ class BidirectionalLSTM(nn.Module):
         self.hidden = self.repackage_hidden(self.hidden)
         output, self.hidden = self.lstm(inputs, self.hidden)
         return output
+
 class MatchingNetwork(nn.Module):
-    def __init__(self, keep_prob, batch_size=32, num_channels=1, learning_rate=1e-3, fce=False, num_classes_per_set=20, \
-                 num_samples_per_class=1, image_size=28):
+    def __init__(self, arg):
         """
         Matching Network
         :param keep_prob: dropout rate
@@ -142,17 +138,17 @@ class MatchingNetwork(nn.Module):
         :param image_size:
         """
         super(MatchingNetwork, self).__init__()
-        self.batch_size = batch_size
-        self.keep_prob = keep_prob
-        self.num_channels = num_channels
-        self.learning_rate = learning_rate
-        self.num_classes_per_set = num_classes_per_set
-        self.num_samples_per_class = num_samples_per_class
-        self.image_size = image_size
+        self.batch_size = arg.batch_size
+        self.keep_prob = arg.keep_prob
+        self.num_channels = arg.num_channels
+        self.learning_rate = arg.lr
+        self.num_classes_per_set = arg.n_way
+        self.num_samples_per_class = arg.k_shot
+        self.image_size = arg.image_size
         # Let's set all peices of Matching Networks Architecture
-        self.g = Embeddings_extractor(layer_size=64, num_channels=num_channels, dropout_prob=keep_prob,
-                                      image_size=image_size)
-        self.f = fce  # if we are considering full-context embeddings
+        self.g = Embeddings_extractor(layer_size=64, num_channels=self.num_channels, dropout_prob=self.keep_prob,
+                                      image_size=self.image_size)
+        self.f = arg.fce  # if we are considering full-context embeddings
         self.c = DistanceNetwork()  # cosine distance among embeddings
         self.a = AttentionalClassify()  # softmax of cosine distance of embeddings
         if self.f:
@@ -194,35 +190,6 @@ class MatchingNetwork(nn.Module):
         crossentropy_loss = F.cross_entropy(preds, target_y.long())
 
         return accuracy, crossentropy_loss
-
-if __name__ == '__main__':
-    batch_size = 20
-    num_channels = 1
-    lr = 1e-3
-    image_size = 28
-    classes_per_set = 20
-    samples_per_class = 1
-    keep_prob = 0.0
-    fce = True
-    matchNet = MatchingNetwork(keep_prob, batch_size, num_channels, lr, fce, classes_per_set,
-                               samples_per_class, image_size)
-
-    x_support_set = torch.randn([20, 20, 1, 28, 28])
-    y_support_set_one_hot = torch.randn([20, 20])
-    x_target = torch.randn([20, 1, 28, 28])
-    y_target = torch.randn([20,])
-
-    acc, c_loss = matchNet(x_support_set, y_support_set_one_hot, x_target, y_target)
-
-
-
-
-
-
-
-
-
-
 
 
 

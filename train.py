@@ -1,109 +1,125 @@
+import  argparse
+from torch.autograd import Variable
 import numpy as np
 import torch
-import torch.nn as nn
-from torch.autograd import Variable
 
-import tqdm
-import torch.backends.cudnn as cudnn
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from matchnet import MatchingNetwork
 
-import dataloder
-import matchnet
+import matplotlib.pyplot as plt
+
+from load_batch import get_batch
 
 
-def run_epoch(total_train_batches, datatset, name='train'):
-    """
-    Run the training epoch
-    :param total_train_batches: Number of batches to train on
-    :return:
-    """
-    total_c_loss = 0.0
-    total_accuracy = 0.0
-    for i in range(int(total_train_batches)):
-        x_support_set, y_support_set, x_target, y_target = dataloder.get_batch(datatset,name,batch_size=16,n_way=5,k_shot=2)
-        x_support_set = Variable(torch.from_numpy(x_support_set)).float()
-        y_support_set = Variable(torch.from_numpy(y_support_set), requires_grad=False).long()
-        x_target = Variable(torch.from_numpy(x_target)).float()
-        y_target = Variable(torch.from_numpy(y_target), requires_grad=False).squeeze().long()
+def plot_loss(train, val, name1="train_loss", name2="val_loss", title=""):
+    plt.title(title)
+    plt.plot(train, label=name1)
+    plt.plot(val, label=name2)
+    plt.legend()
 
-        # convert to one hot encoding
-        y_support_set = y_support_set.unsqueeze(2) # 第二个维度上添加一个维度
-        sequence_length = y_support_set.size()[1]
-        batch_size = y_support_set.size()[0]
-        y_support_set_one_hot = Variable(
-            torch.zeros(batch_size, sequence_length, n_way).scatter_(2,y_support_set.data,1), requires_grad=False) # scatter_原位操作
+def main():
+    print(args)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # 初始化网络对象
+    matchNet = MatchingNetwork(args).to(device)
+    tmp = filter(lambda x: x.requires_grad, matchNet.parameters())
+    num = sum(map(lambda x: np.prod(x.shape), tmp))
+    print('Total trainable tensors:', num)
+    # 参数优化器
+    optimizer = torch.optim.Adam(matchNet.parameters(), lr=args.lr, weight_decay=args.wd)
 
-        # reshape channels and change order
-        size = x_support_set.size()
-        x_support_set = x_support_set.permute(0, 1, 4, 2, 3)
-        x_target = x_target.permute(0, 3, 1, 2)
-        # 输入网络计算精度和损失
-        acc, c_loss = matchNet(x_support_set, y_support_set_one_hot, x_target, y_target)
-        if name == 'train':
-            # optimize process
-            optimizer.zero_grad()
-            c_loss.backward()
-            optimizer.step()
-
-        iter_out = "tr_loss: {}, tr_accuracy: {}".format(c_loss, acc)
-        print(iter_out)
-        total_c_loss += c_loss
-        total_accuracy += acc
-
-    total_c_loss = total_c_loss / total_train_batches
-    total_accuracy = total_accuracy / total_train_batches
-    return total_c_loss, total_accuracy
-
-
-if __name__ == '__main__':
-    keep_prob = 0.0
-    batch_size = 20
-    num_channels = 1
-    lr = 1e-3
-    fce = True
-    n_way = 20
-    k_shot = 1
-    image_size = 150
-
-    optim = "adam"
-    wd = 0
-    # 加载数据
-    x = np.load('F:\jupyter_notebook\DAGAN\datasets\IITDdata_left.npy')  # Load Data
-    # print(x.shape) #(230, 6, 150, 150, 1)
-    np.random.shuffle(x)  # shuffle dataset
-    x_train, x_val = x[:160], x[160:]  # divide dataset in to train, val
-    # Normalize Dataset
-    x_train = dataloder.processes_batch(x_train, np.mean(x_train), np.std(x_train))
-    x_val = dataloder.processes_batch(x_val, np.mean(x_val), np.std(x_val))
-    # Defining dictionary of dataset
-    datatset = {"train": x_train, "val": x_val}
-
-    # 建立网络对象
-    matchNet = matchnet.MatchingNetwork(keep_prob, batch_size, num_channels, lr, fce, n_way,
-                                        k_shot, image_size)
-    # 设置参数优化器
-    optimizer = torch.optim.Adam(matchNet.parameters(), lr=lr, weight_decay=wd)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', verbose=True)
-
-    # Training setup
-    total_epochs = 20
-    total_train_batches = 100
-    total_val_batches = 10
-    total_test_batches = 10
-
+    # 迭代
     train_loss, train_accuracy = [], []
     val_loss, val_accuracy = [], []
-    test_loss, test_accuracy = [], []
-    for e in range(total_epochs):
+    def run_epoch(args, name):
+        """
+        Run the training epoch
+        :param total_train_batches: Number of batches to train on
+        :return:
+        """
+        total_c_loss = 0.0
+        total_accuracy = 0.0
+
+        for i in range(int(args.total_train_batches)):
+            x_support_set, y_support_set, x_target, y_target = get_batch(args, name)
+            x_support_set = Variable(torch.from_numpy(x_support_set)).float()
+            y_support_set = Variable(torch.from_numpy(y_support_set), requires_grad=False).long()
+            x_target = Variable(torch.from_numpy(x_target)).float()
+            y_target = Variable(torch.from_numpy(y_target), requires_grad=False).squeeze().long()
+
+            # convert to one hot encoding
+            y_support_set = y_support_set.unsqueeze(2)
+            sequence_length = y_support_set.size()[1]
+            batch_size = y_support_set.size()[0]
+            y_support_set_one_hot = Variable(
+                torch.zeros(batch_size, sequence_length,
+                            args.n_way).scatter_(2, y_support_set.data, 1), requires_grad=False)
+
+            # reshape channels and change order
+            size = x_support_set.size()
+            x_support_set = x_support_set.permute(0, 1, 4, 2, 3)
+            x_target = x_target.permute(0, 3, 1, 2)
+
+            x_support_set, y_support_set_one_hot, x_target, y_target = x_support_set.to(device), y_support_set_one_hot.to(device), \
+                                                                    x_target.to(device), y_target.to(device)
+
+            acc, c_loss = matchNet(x_support_set, y_support_set_one_hot, x_target, y_target)
+
+            if name == 'train':
+                # optimize process
+                optimizer.zero_grad()
+                c_loss.backward()
+                optimizer.step()
+
+            iter_out = "tr_loss: {}, tr_accuracy: {}".format(c_loss, acc)
+            print(iter_out)
+            total_c_loss += c_loss
+            total_accuracy += acc
+
+        total_c_loss = total_c_loss / args.total_train_batches
+        total_accuracy = total_accuracy / args.total_train_batches
+        return total_c_loss, total_accuracy
+    for e in range(args.total_epochs):
         ############################### Training Step ##########################################
-        total_c_loss, total_accuracy = run_epoch(total_train_batches, datatset,'train')
+        total_c_loss, total_accuracy = run_epoch(args,'train')
         train_loss.append(total_c_loss)
         train_accuracy.append(total_accuracy)
-
-        ################################# Validation Step #######################################
-        total_val_c_loss, total_val_accuracy = run_epoch(total_val_batches,datatset, 'val')
+    ################################# Validation Step #######################################
+        total_val_c_loss, total_val_accuracy = run_epoch(args, 'test')
         val_loss.append(total_val_c_loss)
         val_accuracy.append(total_val_accuracy)
         print("Epoch {}: train_loss:{:.2f} train_accuracy:{:.2f} valid_loss:{:.2f} valid_accuracy:{:.2f}".
               format(e, total_c_loss, total_accuracy, total_val_c_loss, total_val_accuracy))
 
+    plot_loss(train_loss, val_loss, "train_loss", "val_loss", "Loss Graph")
+    plot_loss(train_accuracy, val_accuracy, "train_accuracy", "val_accuracy", "Accuracy Graph")
+
+
+if __name__ == '__main__':
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('--train_data', type=str, help='',
+                           default='F:\jupyter_notebook\DAGAN\datasets\IITDdata_left.npy')
+    argparser.add_argument('--test_data', type=str, help='',
+                           default='F:\jupyter_notebook\DAGAN\datasets\PolyUROI.npy')
+
+    argparser.add_argument('--n_way', type=int, help='n way', default=5)
+
+    argparser.add_argument('--k_shot', type=int, help='k shot for support set', default=3)  # default=1
+    argparser.add_argument('--t_batchsz', type=int, help='train-batchsz', default=5000)
+    argparser.add_argument('--batch_size', type=int, help='一个任务集合中任务的个数', default=16)
+
+    argparser.add_argument('--keep_prob', type=int, help='keep_prob', default=0.0)
+    argparser.add_argument('--lr', type=float, help='meta-level outer learning rate', default=1e-3)
+    argparser.add_argument('--image_size', type=int, help='image_size', default=150)  # 调节的图像尺寸
+    argparser.add_argument('--num_channels', type=int, help='num_channels', default=1)
+    argparser.add_argument('--fce', type=bool, help='fce', default=True)
+    argparser.add_argument('--wd', type=int, help='wd', default=0)
+
+    argparser.add_argument('--total_epochs', type=int, help='total_epochs number', default=20)
+    argparser.add_argument('--total_train_batches', type=int, help='total_train_batches number', default=100)
+    argparser.add_argument('--total_val_batches', type=int, help='total_val_batches number', default=10)
+    argparser.add_argument('--total_test_batches', type=int, help='total_test_batches number', default=10)
+
+    argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=5)
+
+    args = argparser.parse_args()
+    main()
