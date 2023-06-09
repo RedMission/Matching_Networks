@@ -99,17 +99,17 @@ if __name__ == '__main__':
     argparser.add_argument('--train_data', type=str, help='',
                            default='F:\jupyter_notebook\DAGAN\datasets\IITDdata_left.npy')
     argparser.add_argument('--test_data', type=str, help='',
-                           default='F:\jupyter_notebook\DAGAN\datasets\PolyUROI.npy')
+                           default='F:\jupyter_notebook\DAGAN\datasets\IITDdata_right.npy')
 
     argparser.add_argument('--n_way', type=int, help='n way', default=5)
 
     argparser.add_argument('--k_shot', type=int, help='k shot for support set', default=3)  # default=1
     argparser.add_argument('--t_batchsz', type=int, help='train-batchsz', default=5000)
-    argparser.add_argument('--batch_size', type=int, help='一个任务集合中任务的个数', default=16)
+    argparser.add_argument('--batch_size', type=int, help='一个任务集合中任务的个数', default=4)
 
     argparser.add_argument('--keep_prob', type=int, help='keep_prob', default=0.0)
     argparser.add_argument('--lr', type=float, help='meta-level outer learning rate', default=1e-3)
-    argparser.add_argument('--image_size', type=int, help='image_size', default=150)  # 调节的图像尺寸
+    argparser.add_argument('--image_size', type=int, help='image_size', default=84)  # 图像尺寸——用于设定网络结构，需要设定调节data尺寸
     argparser.add_argument('--num_channels', type=int, help='num_channels', default=1)
     argparser.add_argument('--fce', type=bool, help='fce', default=True)
     argparser.add_argument('--wd', type=int, help='wd', default=0)
