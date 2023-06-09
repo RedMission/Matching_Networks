@@ -6,7 +6,6 @@ import numpy as np
 from torch.autograd import Variable
 import torch.nn.functional as F
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def convLayer(in_channels, out_channels, dropout_prob=0.0):
     """
@@ -92,7 +91,7 @@ class DistanceNetwork(nn.Module):
         similarities = torch.stack(similarities)
         return similarities.t()
 class BidirectionalLSTM(nn.Module):
-    def __init__(self, layer_size, batch_size, vector_dim):
+    def __init__(self, layer_size, batch_size, vector_dim,device):
         super(BidirectionalLSTM, self).__init__()
         """
         Initial a muti-layer Bidirectional LSTM
@@ -145,6 +144,7 @@ class MatchingNetwork(nn.Module):
         self.num_classes_per_set = arg.n_way
         self.num_samples_per_class = arg.k_shot
         self.image_size = arg.image_size
+        self.device = arg.device
         # Let's set all peices of Matching Networks Architecture
         self.g = Embeddings_extractor(layer_size=64, num_channels=self.num_channels, dropout_prob=self.keep_prob,
                                       image_size=self.image_size)
@@ -152,7 +152,7 @@ class MatchingNetwork(nn.Module):
         self.c = DistanceNetwork()  # cosine distance among embeddings
         self.a = AttentionalClassify()  # softmax of cosine distance of embeddings
         if self.f:
-            self.lstm = BidirectionalLSTM(layer_size=[32], batch_size=self.batch_size, vector_dim=self.g.outSize)
+            self.lstm = BidirectionalLSTM(layer_size=[32], batch_size=self.batch_size, vector_dim=self.g.outSize, device = self.device)
 
     def forward(self, support_set_images, support_set_y_one_hot, target_image, target_y):
         """
