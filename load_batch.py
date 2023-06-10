@@ -31,10 +31,10 @@ def sample_batch(arg,dataset):
     :return: [support_set_x,support_set_y,target_x,target_y] for Matching Networks
     """
     support_set_x = np.zeros((arg.batch_size, arg.n_way, arg.k_shot, arg.image_size,
-                              arg.image_size, dataset.shape[4]), np.float32)
+                              arg.image_size, dataset.shape[4]), np.float16)
     support_set_y = np.zeros((arg.batch_size, arg.n_way, arg.k_shot), np.int32)
 
-    target_x = np.zeros((arg.batch_size, arg.image_size, arg.image_size, dataset.shape[4]), np.float32)
+    target_x = np.zeros((arg.batch_size, arg.image_size, arg.image_size, dataset.shape[4]), np.float16)
     target_y = np.zeros((arg.batch_size, 1), np.int32)
 
     for i in range(arg.batch_size):
@@ -62,14 +62,15 @@ def get_batch(arg,dataset_name):
     dataset = np.load(datatset[dataset_name])
     np.random.shuffle(dataset)  # shuffle dataset
 
-    # 数据归一化
-    dataset = processes_batch(dataset, np.mean(dataset), np.std(dataset))
+    # # 数据归一化
+    # dataset = processes_batch(dataset, np.mean(dataset), np.std(dataset))
 
     support_set_x, support_set_y, target_x, target_y = sample_batch(arg,dataset)
     # support_set_x(batch_size, way, shot, h, w, c)
     support_set_x = support_set_x.reshape((support_set_x.shape[0], support_set_x.shape[1] * support_set_x.shape[2],
                                            support_set_x.shape[3], support_set_x.shape[4], support_set_x.shape[5]))
     support_set_y = support_set_y.reshape(support_set_y.shape[0], support_set_y.shape[1] * support_set_y.shape[2])
+    del dataset
     return support_set_x, support_set_y, target_x, target_y
 
 

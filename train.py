@@ -41,7 +41,6 @@ def main():
         total_accuracy = 0.0
 
         for i in range(int(args.total_train_batches)):
-            # 删除不再需要的张量
             x_support_set, y_support_set, x_target, y_target = get_batch(args, name)
             x_support_set = Variable(torch.from_numpy(x_support_set)).float()
             y_support_set = Variable(torch.from_numpy(y_support_set), requires_grad=False).long()
@@ -76,6 +75,8 @@ def main():
             print(iter_out)
             total_c_loss += c_loss
             total_accuracy += acc
+            # 删除不再需要的张量
+            del x_support_set, y_support_set, x_target, y_target
 
         total_c_loss = total_c_loss / args.total_train_batches
         total_accuracy = total_accuracy / args.total_train_batches
@@ -94,7 +95,7 @@ def main():
 
     plot_loss(train_loss, val_loss, "train_loss", "val_loss", "Loss Graph")
     plot_loss(train_accuracy, val_accuracy, "train_accuracy", "val_accuracy", "Accuracy Graph")
-
+    plt.imshow()
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
@@ -106,16 +107,16 @@ if __name__ == '__main__':
     argparser.add_argument('--n_way', type=int, help='n way', default=5)
     argparser.add_argument('--k_shot', type=int, help='k shot for support set', default=3)  # default=1
     # argparser.add_argument('--t_batchsz', type=int, help='train-batchsz', default=5000)
-    argparser.add_argument('--batch_size', type=int, help='一个任务集合中任务的个数', default=16)
+    argparser.add_argument('--batch_size', type=int, help='一个任务集合中任务的个数', default=10)
 
     argparser.add_argument('--keep_prob', type=int, help='keep_prob', default=0.0)
     argparser.add_argument('--lr', type=float, help='meta-level outer learning rate', default=1e-3)
-    argparser.add_argument('--image_size', type=int, help='image_size', default=84)  # 图像尺寸——用于设定网络结构，需要设定调节data尺寸
+    argparser.add_argument('--image_size', type=int, help='image_size', default=32)  # 图像尺寸——用于设定网络结构，需要设定调节data尺寸
     argparser.add_argument('--num_channels', type=int, help='num_channels', default=1)
     argparser.add_argument('--fce', type=bool, help='fce', default=True)
     argparser.add_argument('--wd', type=int, help='wd', default=0)
 
-    argparser.add_argument('--total_epochs', type=int, help='total_epochs number', default=100)
+    argparser.add_argument('--total_epochs', type=int, help='total_epochs number', default=50)
     argparser.add_argument('--total_train_batches', type=int, help='total_train_batches number', default=50)
     argparser.add_argument('--total_val_batches', type=int, help='total_val_batches number', default=10)
     argparser.add_argument('--total_test_batches', type=int, help='total_test_batches number', default=10)

@@ -87,8 +87,8 @@ class DistanceNetwork(nn.Module):
             support_manitude = sum_support.clamp(eps, float("inf")).rsqrt()
             dot_product = input_image.unsqueeze(1).bmm(support_image.unsqueeze(2)).squeeze()
             cosine_similarity = dot_product * support_manitude
-            similarities.append(cosine_similarity)
-        similarities = torch.stack(similarities)
+            similarities.append(cosine_similarity) # similarities有15个元素 cosine_similarity为16
+        similarities = torch.stack(similarities) # 15,16
         return similarities.t()
 class BidirectionalLSTM(nn.Module):
     def __init__(self, layer_size, batch_size, vector_dim,device):
