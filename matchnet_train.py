@@ -51,7 +51,7 @@ def main():
     for epoch in range(args.epoch//args.t_batchsz):  #
         print("epoch:",epoch)
         # db = DataLoader(train_data, args.task_num, shuffle=True, num_workers=1, pin_memory=True)
-        db = DataLoader(train_data, args.task_num, shuffle=True, num_workers=2, pin_memory=True) # 生成可以将所有任务跑一遍的迭代器
+        db = DataLoader(train_data, args.task_num, shuffle=True, num_workers=4, pin_memory=True) # 生成可以将所有任务跑一遍的迭代器
 
         for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(db): # 从迭代器取任务组合，每组完成一次外层循环，共step步外循环
 
@@ -68,10 +68,10 @@ def main():
             writer.add_scalar('train/loss',loss.item(), epoch*(args.t_batchsz//args.task_num)+step)
             writer.add_scalar('train/acc',accs.item(), epoch*(args.t_batchsz//args.task_num)+step)
 
-            if step % 200 == 0:
+            if step % 100 == 0:
                 print('step:', step, '\t training acc:', accs.item())
                 # evaluation
-                db_test = DataLoader(test_data, args.task_num, shuffle=True, num_workers=2, pin_memory=True) # 测试 生成可以将所有任务跑一遍的迭代器
+                db_test = DataLoader(test_data, args.task_num, shuffle=True, num_workers=4, pin_memory=True) # 测试 生成可以将所有任务跑一遍的迭代器
                 accs_all_test = []
 
                 for x_spt, y_spt, x_qry, y_qry in db_test:
@@ -88,8 +88,8 @@ def main():
 if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--train_data', type=str, help='', default='F:\jupyter_notebook\DAGAN\datasets\IITDdata_left.npy')
-    argparser.add_argument('--test_data', type=str, help='', default='F:\jupyter_notebook\DAGAN\datasets\PolyUROI.npy')
+    argparser.add_argument('--train_data', type=str, help='', default='F:\jupyter_notebook\DAGAN\datasets\IITDdata_left_PSA+SC+MC+W_6.npy')
+    argparser.add_argument('--test_data', type=str, help='', default='F:\jupyter_notebook\DAGAN\datasets\IITDdata_right.npy')
 
     argparser.add_argument('--epoch', type=int, help='epoch number', default=60000)
     argparser.add_argument('--n_way', type=int, help='n way', default=5)
@@ -100,12 +100,9 @@ if __name__ == '__main__':
 
     argparser.add_argument('--imgsz', type=int, help='imgsz', default=84) # 调节的图像尺寸
     argparser.add_argument('--imgc', type=int, help='imgc', default=1)
-    argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=10)
+    argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=5)
     argparser.add_argument('--lr', type=float, help='learning rate', default=1e-3)
 
-    argparser.add_argument('--update_step', type=int, help='task-level inner update steps', default=5)
-    argparser.add_argument('--update_step_test', type=int, help='update steps for finetunning', default=10)
-    ############
     argparser.add_argument('--keep_prob', type=int, help='keep_prob', default=0.0)
     argparser.add_argument('--device', type=str, help='device', default="cuda")
     argparser.add_argument('--fce', type=bool, help='fce', default=True)
